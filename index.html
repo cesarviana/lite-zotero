@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet"
+    href="https://web.archive.org/web/20220626074417cs_/https://unpkg.com/semantic-ui@2.3.1/dist/semantic.min.css">
+  <link rel="stylesheet"
+    href="https://web.archive.org/web/20220626074417cs_/https://cdn.jsdelivr.net/npm/jqcloud2@2.0.3/dist/jqcloud.min.css">
+  <title>Acadêmic Papers</title>
+  <style>
+    @media (max-width: 360px) {
+      #cloud {
+        margin: 0 auto;
+        width: 100%;
+        height: 40vw;
+      }
+
+      .container {
+        padding: 0;
+        margin: 0;
+      }
+
+      div.input,
+      input {
+        width: 100%;
+      }
+
+      .publications,
+      .segment {
+        padding: 0 !important;
+      }
+    }
+
+    .segment {
+      min-height: 70px;
+    }
+
+    .publications {
+      padding: 1vw;
+    }
+
+    .publication {
+      margin: 0 0 .5vw .5vw;
+      padding: 1vw;
+      border-radius: 1vw;
+      width: 100% !important;
+    }
+
+    h2 {
+      margin-top: 2vw !important;
+    }
+
+    h3 {
+      margin-bottom: 5px;
+    }
+
+    @media (min-width: 720px) {
+
+      #cloud {
+        margin: 0 auto;
+        height: 15vw;
+      }
+
+      .years {
+        display: flex;
+      }
+
+    }
+
+    .conferencePaper {
+      background: #E7F2F8 !important
+    }
+
+    .journalArticle {
+      background: #fbfbe8 !important
+    }
+
+    .book {
+      background: #91d6e4 !important
+    }
+
+    .bookSection {
+      background: #EFE7BC !important
+    }
+
+    .thesis {
+      background: #facfd4 !important
+    }
+
+    .blogPost {
+      background: #dffff0 !important
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+
+    <div id="cloud"></div>
+
+    <div class="ui form">
+      <div class="three fields">
+
+        <div class="field">
+
+          <select name="project" id="project" v-model="selectedProject" @change="showPublications" class="ui selection">
+            <option :value="undefined">Todos os projetos</option>
+            <option v-for="project in projects" :key="project" :value="project">{{project}}</option>
+          </select>
+
+        </div>
+        <div class="field">
+
+          <select name="type" id="type" v-model="apiFilters.itemType" @change="showPublications" class="ui selection">
+            <option :value="undefined">Tipos de publicação</option>
+            <option v-for="type in publicationTypes" :key="type.type" :value="type.type">{{type.name}}</option>
+          </select>
+
+        </div>
+        <div class="field">
+
+          <div class="ui icon input">
+            <input type="text" placeholder="Pesquisar..." v-model="apiFilters.search" @keyup.enter="search">
+            <i class="search link icon" @click="search"></i>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="ui segment">
+      <div v-for="year in sortedYears" :key="year.number" class="years">
+        <h2> {{ year.number }} </h2>
+        <div class="publications">
+          <div class="publication ui card" v-for="publication in year.publications" :key="publication.key"
+            :class="publication.data.itemType">
+            <p class="content">
+              <span v-html="publication.citation"></span>
+              <span v-if="publication.data.DOI">DOI: {{publication.data.DOI}}.</span>
+            </p>
+            <div class="extra content">
+              <span v-if="publication.data.DOI">
+                <a :href="`https://doi.org/${publication.data.DOI}`" target="_blank" class="ui icon basic button"
+                  title="Acessar via DOI">
+                  <i class="icon file outline"></i>
+                  DOI
+                </a>
+              </span>
+              <span v-if="publication.data.url">
+                <a target="_blank" :href="publication.data.url" class="ui icon basic button">
+                  <i class="icon linkify"></i>
+                  Acessar
+                </a>
+              </span>
+              <span v-if="!publication.data.url &amp;&amp; !publication.data.DOI">
+                <a target="_blank" :href="`https://google.com.br/search?q=${publication.data.title}`"
+                  class="ui icon basic button">
+                  <i class="icon search"></i>
+                  Buscar
+                </a>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="loading" class="ui active inverted dimmer">
+        <div class="ui text loader">Buscando publicações...</div>
+        <p></p>
+      </div>
+      <div v-if="!loading &amp;&amp; publications.length == 0">Nenhuma publicação para estes filtros.</div>
+      <button v-else class="ui default fluid button" @click="loadMore">Carregar mais publicações</button>
+
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+  <script src="https://unpkg.com/axios@0.2.1/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/semantic-ui@2.3.1/dist/semantic.min.js"></script>
+
+  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
+  <script src="https://unpkg.com/tinycolor2@1.4.1/dist/tinycolor-min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tinygradient@1.1.4/browser.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jqcloud2@2.0.3/dist/jqcloud.min.js"></script>
+
+  <script>
+
+    const GROUP_ID = '4077554'
+    const COLLECTION_ID = '83YIGLLI'
+
+    const ITEMS_PER_REQUEST = 7
+    const DEFAULT_CACHE_KEY = 'no_filters'
+
+    const app = new Vue({
+      el: '#app',
+      data: {
+        loading: false,
+        groupId: GROUP_ID,
+        years: {},
+        projects: [],
+        apiFilters: {
+          limit: ITEMS_PER_REQUEST,
+          sort: 'date',
+          search: '',
+          tag: '',
+          itemType: undefined
+        },
+        publicationTypes: [
+          { name: 'Artigos de Conferências', type: 'conferencePaper' },
+          { name: 'Artigos de Revistas', type: 'journalArticle' },
+          { name: 'Livros', type: 'book' },
+          { name: 'Capítulos de Livros', type: 'bookSection' },
+          { name: 'Monografias', type: 'thesis' },
+          { name: 'Blogs', type: 'blogPost' },
+        ],
+        selectedProject: undefined,
+        cache: {
+          recent: {
+            publications: []
+          }
+        }
+      },
+      async created() {
+        this.loading = true;
+        try {
+          this.projects = (await getTags(GROUP_ID))
+            .map(tag => tag.tag)
+          this.initializeCaches()
+          await this.showPublications()
+          this.createCloud()
+          this.updateCloud()
+        } finally {
+          this.loading = false;
+        }
+      },
+      computed: {
+        currentCache() {
+          const project = this.selectedProject || ''
+          const itemType = this.apiFilters.itemType || ''
+          return this.cache[project + itemType || DEFAULT_CACHE_KEY] || this.cache.recent
+        },
+        sortedYears() {
+          const sortedYears = Object.keys(this.years).sort().reverse().map(number => {
+            return {
+              number,
+              publications: this.years[number].publications
+            }
+          })
+
+          return sortedYears.filter(it => it.publications.length > 0)
+        },
+        filteringProject() {
+          return this.selectedProject !== undefined
+        },
+        selectedProjectCache() {
+          if (!this.filteringProject)
+            throw 'Not filtering project, so there is no project cache to select'
+          return this.cache[this.selectedProject]
+        },
+        publications() {
+          let result = []
+          for (let yearAndPublications of this.sortedYears) {
+            result = result.concat(yearAndPublications.publications)
+          }
+          return result
+        },
+        visiblePublications() {
+          return this.sortedYears.map(year => year.publications).flat()
+        },
+        joinedCloudText() {
+          return this.visiblePublications
+            .map((publication) => abstractOf(publication) + ' ' + titleOf(publication))
+            .filter(text => text.length > 0)
+            .join()
+        },
+        bestAbstractWords() {
+          const unusedWords = ['para', 'that', 'their', 'está', 'this', 'from', 'este', 'have', 'also', 'half', 'with', 'than', 'through', 'trazer', 'article', 'allows', 'mais', 'contexto', 'will']
+
+          return this.joinedCloudText.split(" ")
+            .filter(word => word.length > 3)
+            .filter(word =>
+              unusedWords.includes(word.toLowerCase()) == false
+            )
+        },
+        wordsQuantity() {
+          const words = {}
+
+          this.bestAbstractWords.forEach(word => {
+            if (!words[word]) {
+              words[word] = 1
+            } else {
+              words[word]++
+            }
+          })
+
+          return words
+        },
+        wordsWithWeight() {
+          const result = []
+
+          const wordsQuantity = this.wordsQuantity;
+
+          Object.keys(wordsQuantity).forEach(word => {
+            result.push({
+              text: word,
+              weight: wordsQuantity[word]
+            })
+          })
+
+          return result
+        },
+      },
+      methods: {
+        initializeCaches() {
+          this.cache = {}
+          this.projects.forEach(project => {
+            this.cache[DEFAULT_CACHE_KEY] = { publications: [] }
+            // cache / project
+            this.cache[project] = { publications: [] }
+            this.publicationTypes.forEach(itemType => {
+              // cache / project / itemType
+              this.cache[project + itemType.type] = { publications: [] }
+            })
+          })
+          this.publicationTypes.forEach(itemType => {
+            // cache / itemType
+            this.cache[itemType.type] = { publications: [] }
+          })
+        },
+        async loadMore() {
+          const publications = await this.loadPublications()
+          this.appendPublications(publications)
+          this.updateCloud()
+        },
+        async showPublications() {
+          const cache = this.currentCache
+          const hasCache = cache.publications.length > 0
+
+          const publications = hasCache ? cache.publications : await this.loadPublications()
+
+          this.replacePublications(publications)
+
+          this.updateCloud()
+        },
+        async loadPublications() {
+          this.loading = true
+          try {
+            const cache = this.currentCache
+
+            const filters = {
+              ...this.apiFilters,
+              start: cache.publications.length,
+              tag: this.selectedProject
+            }
+
+            const items = await getItems(GROUP_ID, filters)
+            return this.convertItemsIntoPublications(items)
+          } finally {
+            this.loading = false
+          }
+        },
+        convertItemsIntoPublications(items) {
+          const publications = filterPublications(items)
+          const attachments = filterAttachments(items)
+          linkPublicationsAndAttachments(publications, attachments)
+          return publications
+        },
+        replacePublications(publications) {
+          this.currentCache.publications = publications
+          this.years = groupByYear(publications)
+        },
+        appendPublications(publications) {
+          let newPublications = this.publications.concat(publications)
+          this.currentCache.publications = newPublications
+          this.years = groupByYear(newPublications)
+        },
+        search() {
+          this.initializeCaches()
+          this.showPublications()
+        },
+        createCloud() {
+
+          const words = this.wordsWithWeight
+          if (words.length == 0) {
+            console.warn('No words to put in the cloud')
+            return;
+          }
+
+          $(document).ready(function () {
+            const gradient = tinygradient('#3b82a8', '#c8c84a', '#1f97af', '#c75461').rgb(words.length)
+            $('#cloud').jQCloud(words, {
+              delay: 5,
+              autoResize: true,
+              colors: function (step) {
+                return gradient[words.length / step]
+              }
+            });
+          })
+        },
+        updateCloud() {
+          const words = this.wordsWithWeight
+          $('#cloud').jQCloud('update', words);
+        }
+      }
+    })
+    async function getTags(groupId) {
+      return axios.get(`https://api.zotero.org/groups/${groupId}/tags`)
+    }
+    async function getItems(groupId, filters) {
+      const { start, limit, sort, search, tag, itemType } = filters
+      return axios.get(`https://api.zotero.org/groups/${groupId}/items?format=json&include=data,citation&style=associacao-brasileira-de-normas-tecnicas-note&start=${start}&limit=${limit}&sort=${sort}&q=${search || ''}&tag=${tag || ''}&itemType=${itemType || ''}`)
+    }
+    function filterPublications(items) {
+      return items.filter(item => typeOf(item) != "attachment")
+    }
+    function filterAttachments(items) {
+      return items.filter(item => typeOf(item) == "attachment")
+    }
+    function linkPublicationsAndAttachments(publications, attachments) {
+      for (let publication of publications)
+        addAttachmentsFor(publication, attachments)
+    }
+    function abstractOf(publication) {
+      return publication.data.abstractNote
+    }
+    function titleOf(publication) {
+      return publication.data.title
+    }
+    function typeOf(item) {
+      return item.data.itemType
+    }
+    function areRelated(publication, attachment) {
+      return keyOf(publication) == parentKey(attachment)
+    }
+    function keyOf(item) {
+      return item.key
+    }
+    function parentKey(item) {
+      return item.data.parentItem
+    }
+    function addAttachmentsFor(publication, attachments) {
+      publication.attachments = attachments.filter(attachment => areRelated(publication, attachment))
+    }
+    function attach(publication, attachment) {
+      if (!publication.attachments)
+        publication.attachments = []
+      publication.attachments.push(attachment)
+    }
+    function getYearOf(publication) {
+      const matches = publication.data.date.match(/\d{4}/g)
+      if (matches && matches.length > 0)
+        return new Number(matches[0])
+      return "Sem ano"
+    }
+    function isNew(year, years) {
+      return years[year] === undefined
+    }
+    function groupByYear(publications) {
+      const result = {}
+      for (let publication of publications) {
+        const year = getYearOf(publication)
+        if (isNew(year, result)) {
+          result[year] = {
+            publications: []
+          }
+        }
+        result[year].publications.push(publication)
+      }
+      return result;
+    }
+  </script>
+</body>
+
+</html>
